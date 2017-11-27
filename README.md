@@ -1,7 +1,7 @@
 # SID
 
 Sequence Identifier class.
-This is used to move constants from SQL to PHP code
+Class is used to move constants from SQL to PHP code and for other uses.
 
 ## Before SID:
 

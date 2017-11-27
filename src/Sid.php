@@ -1,27 +1,33 @@
 <?
 namespace HalimonAlexander\Sid;
+
 use HalimonAlexander\Sid\Exception\SidRuntimeException;
 
 /**
  * Class Sid
- * Format:
- * NAME = SID
- *
- * @package Core
- * @subpackage Classes
- *
- * @copyright Copyright (c) 2013-2016
- * @author A.Halimon <vvthanatos@gmail.com>
  */
-abstract class Sid extends \ReflectionClass
-{
+abstract class Sid{
+
+  /** @var null */
   protected static $vocabulary = null;
+
+  /** @var array As list [name => value] */
   protected static $list = [];
 
   /**
-   *
+   * @var string
    */
-  protected static function extractConstants(){
+  protected static $commonSidNamePattern = '^[A-Za-z][a-zA-Z0-9_-]*$';
+
+  /**
+   * @var string
+   */
+  protected static $hiddenSidNamePattern = '^_([A-Za-z][a-zA-Z0-9_-]*)$';
+
+  /**
+   * Extract constants using ReflectionClass
+   */
+  private static function extractConstants(){
     $oClass = new \ReflectionClass(get_called_class());
     $constants = $oClass->getConstants();
     unset(
@@ -34,60 +40,123 @@ abstract class Sid extends \ReflectionClass
   }
 
   /**
-   * @param $sid
-   * @return bool
+   * @return string
    */
-  protected static function isHidden($name){
-    return $name[0] === '_';
+  private static function getClassWithoutNamespace(){
+    return (new \ReflectionClass(get_called_class()))->getShortName();
   }
 
-  protected static function hiddenValue($list, $name){
-    $_name = $name;
-    $name = ltrim($_name, '_');
-    $list[$name] = $list[$_name];
-    unset($list[$_name]);
+  /**
+   * @return string
+   */
+  private static function getNamespace(){
+    return (new \ReflectionClass(get_called_class()))->getNamespaceName();
+  }
+
+  /**
+   * Get vocabulary instance
+   *
+   * @param $lang string
+   * @return null
+   */
+  private static function getVocabulary($lang){
+    if (self::$vocabulary === null){
+      $vocabularyClass = self::getVocabularyClass();
+      self::$vocabulary = $vocabularyClass::getInstance($lang);
+    }
+    return self::$vocabulary;
+  }
+
+  /**
+   * Check if item is common
+   *
+   * @param $name
+   * @return bool
+   */
+  private static function isCommon($name){
+    return !!preg_match("/".self::$commonSidNamePattern."/", $name);
+  }
+
+  /**
+   * Check if item is hidden
+   *
+   * @param $name
+   * @return bool
+   */
+  private static function isHidden($name){
+    return !!preg_match("/".self::$hiddenSidNamePattern."/", $name, $matches);
+  }
+
+  /**
+   * Check if item is valid
+   *
+   * @param $name
+   * @return bool
+   */
+  private static function isValid($name){
+    return self::isHidden($name) || self::isCommon($name);
+  }
+
+  /**
+   * @return string Vocabulary class name
+   */
+  protected static function getVocabularyClass(){
+    $namespace = self::getNamespace();
+    $vocabularyClass = "{$namespace}\\Vocabulary";
+    if ( !class_exists($vocabularyClass) )
+      throw new SidRuntimeException('Vocabulary class not exists');
+
+    return $vocabularyClass;
+  }
+
+  /**
+   * Update hidden value's name by removing leading _
+   * 
+   * @param $list
+   * @param $name
+   * @return mixed
+   */
+  protected static function updateHiddenValue($list, $name){
+    $sid = $list[$name];
+    unset($list[$name]);
+
+    preg_match("/".self::$hiddenSidNamePattern."/", $name, $match);
+    $list[ $match[1] ] = $sid;
 
     return $list;
   }
 
+  /** Get the number of sids */
+  static function getCount($full = false){
+    return count(static::getList($full));
+  }
+
   /**
-   * @param $lang
-   * @return null
+   * Get the name of default Sid
    */
-  protected static function getVocabulary($lang){
-    if (self::$vocabulary !== null)
-      return self::$vocabulary;
-
-    $tmp = explode('\\', get_called_class());
-    $coreNs = $tmp[0];
-
-
-    $tmp = "\\{$coreNs}\\Classes\\Vocabulary";
-    self::$vocabulary = $tmp::getInstance($lang);
-
-    return self::$vocabulary;
-  }
-  
-  protected static function getClassWithoutNamespace(){
-    $tmp = explode('\\', get_called_class());
-    return array_pop($tmp);
+  static function getDefaultName(){
+    return static::getNameById(static::getDefaultSid());
   }
 
   /**
-   *
-   *
-   * @param int    $id
-   * @param string $lang
-   * @param string $context
+   * Get SID of default Sid
+   */
+  static function getDefaultSid(){
+    $list = static::getList();
+    return $list[0];
+  }
+
+  /**
+   * @param $name
    * @return mixed
    */
-  static function getTitle($id, $lang, $context = 'default')
-  {
-    $name = self::getNameById($id);
-    $class = self::getClassWithoutNamespace();
-    $vocabulary = self::getVocabulary($lang);
-
-    return $vocabulary->getTitle($name, $class, $context);
+  static function getIdByName($name){
+    $list = self::getList();
+    $title = strtoupper($name);
+    if ( !isset($list[$title]) )
+      throw new SidRuntimeException(get_called_class().":{$name} not exists");
+    // todo Need to consider if to use ReflectionClass instead of arrays
+    return $list[$name];
   }
 
   /**
@@ -100,6 +169,10 @@ abstract class Sid extends \ReflectionClass
     if ( empty(self::$list) )
       self::$list = self::extractConstants();
 
+    foreach (self::$list as $name=>$sid)
+      if ( !self::isValid($name) )
+        unset(self::$list[$name]);
+
     $list = self::$list;
     if (!$full){
       foreach ($list as $name=>$sid)
@@ -109,19 +182,10 @@ abstract class Sid extends \ReflectionClass
     else{
       foreach ($list as $name=>$sid)
         if (static::isHidden($name))
-          $list = self::hiddenValue($list, $name);
+          $list = self::updateHiddenValue($list, $name);
     }
 
     return $list;
-  }
-
-  static function getIdByName($name){
-    $list = self::getList();
-    $title = strtoupper($name);
-    if ( !isset($list[$title]) )
-      throw new SidRuntimeException(get_called_class().":{$name} not exists");
-
-    return $list[$name];
   }
 
   /**
@@ -141,24 +205,21 @@ abstract class Sid extends \ReflectionClass
     return $key;
   }
 
-  /** Get the number of sids */
-  static function getCount($full = false){
-    return count(static::getList($full));
-  }
-
   /**
-   * Get SID of default Sid
+   * Get Sid title from vocabulary
+   *
+   * @param int    $id
+   * @param string $lang
+   * @param string $context
+   * @return mixed
    */
-  static function getDefaultSid(){
-    $list = static::getList();
-    return $list[0];
-  }
+  static function getTitle($id, $lang, $context = 'default')
+  {
+    $name = self::getNameById($id);
+    $class = self::getClassWithoutNamespace();
+    $vocabulary = self::getVocabulary($lang);
 
-  /**
-   * Get the name of default Sid
-   */
-  static function getDefaultName(){
-    return static::getNameById(static::getDefaultSid());
+    return $vocabulary->getTitle($name, $class, $context);
   }
 
   /**
