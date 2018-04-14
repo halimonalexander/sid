@@ -1,15 +1,32 @@
-<?php
+<?
+/*
+ * This file is part of Sid.
+ *
+ * (c) Halimon Alexander <vvthanatos@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
 namespace HalimonAlexander\Sid;
 
-use HalimonAlexander\Sid\Exception\SidRuntimeException;
+use ReflectionClass;
+use HalimonAlexander\Sid\Exception\VocabularyCallbackNotSet;
+use HalimonAlexander\Sid\Exception\SidItemNotFound;
 
 /**
  * Class Sid
  */
 abstract class Sid
 {
+    /**
+     * @var array
+     */
+    protected static $vocabularyCallbacks = [];
 
-    /** 
+    /**
      * @var null
      */
     protected static $vocabulary = null;
@@ -29,6 +46,10 @@ abstract class Sid
      */
     protected static $hiddenSidNamePattern = '^_([A-Za-z][a-zA-Z0-9_-]*)$';
 
+    public static $allowDefaultCallback = true;
+
+    public static $defaultCallback = 'self::defaultCallback';
+
     /**
      * Extract constants using ReflectionClass
      */
@@ -41,7 +62,7 @@ abstract class Sid
             $constants['IS_EXPLICIT_ABSTRACT'],
             $constants['IS_FINAL']
         );
-        
+
         return $constants;
     }
 
@@ -50,59 +71,51 @@ abstract class Sid
      */
     private static function getClassWithoutNamespace()
     {
-        return (new \ReflectionClass(get_called_class()))->getShortName();
+        return (new ReflectionClass(get_called_class()))->getShortName();
     }
 
-    /**
-     * @return string
-     */
-    private static function getNamespace()
+    private static function getCallback($language): callable
     {
-        return (new \ReflectionClass(get_called_class()))->getNamespaceName();
-    }
+        if (isset(self::$vocabularyCallbacks[ $language ]))
+            return self::$vocabularyCallbacks[ $language ];
 
-    /**
-     * Get vocabulary instance
-     *
-     * @param $lang string
-     * @return null
-     */
-    private static function getVocabulary($lang)
-    {
-        if (self::$vocabulary === null) {
-            $vocabularyClass = self::getVocabularyClass();
-            self::$vocabulary = $vocabularyClass::getInstance($lang);
-        }
-        
-        return self::$vocabulary;
+        if (self::$allowDefaultCallback)
+            return self::$defaultCallback;
+
+        $classname = self::getClassWithoutNamespace();
+
+        throw new VocabularyCallbackNotSet("Callback for {$language} is not set. Please use {$classname}::setVocabularyCallback first");
     }
 
     /**
      * Check if item is common
      *
      * @param $name
+     *
      * @return bool
      */
     private static function isCommon($name)
     {
-        return !!preg_match("/".self::$commonSidNamePattern."/", $name);
+        return !!preg_match("/" . self::$commonSidNamePattern . "/", $name);
     }
 
     /**
      * Check if item is hidden
      *
      * @param $name
+     *
      * @return bool
      */
     private static function isHidden($name)
     {
-        return !!preg_match("/".self::$hiddenSidNamePattern."/", $name, $matches);
+        return !!preg_match("/" . self::$hiddenSidNamePattern . "/", $name, $matches);
     }
 
     /**
      * Check if item is valid
      *
      * @param $name
+     *
      * @return bool
      */
     private static function isValid($name)
@@ -111,40 +124,30 @@ abstract class Sid
     }
 
     /**
-     * @return string Vocabulary class name
-     */
-    protected static function getVocabularyClass()
-    {
-        $namespace = self::getNamespace();
-        $vocabularyClass = "{$namespace}\\Vocabulary";
-        if (!class_exists($vocabularyClass)) {
-            throw new SidRuntimeException('Vocabulary class not exists');
-        }
-        
-        return $vocabularyClass;
-    }
-
-    /**
      * Update hidden value's name by removing leading _
-     * 
+     *
      * @param $list
      * @param $name
+     *
      * @return mixed
      */
     protected static function updateHiddenValue($list, $name)
     {
-        $sid = $list[$name];
-        unset($list[$name]);
-        
-        preg_match("/".self::$hiddenSidNamePattern."/", $name, $match);
+        $sid = $list[ $name ];
+        unset($list[ $name ]);
+
+        preg_match("/" . self::$hiddenSidNamePattern . "/", $name, $match);
         $list[ $match[1] ] = $sid;
-        
+
         return $list;
     }
 
-    /** 
-     * Get the number of sids
-     */
+    protected static function defaultCallback($name, $class, $context)
+    {
+        echo "{$class}." . strtolower($name);
+    }
+
+    /** Get the number of sids */
     public static function getCount($full = false)
     {
         return count(static::getList($full));
@@ -164,24 +167,26 @@ abstract class Sid
     public static function getDefaultSid()
     {
         $list = static::getList();
-        
+
         return $list[0];
     }
 
     /**
      * @param $name
+     *
      * @return mixed
+     * @throws SidItemNotFound
      */
     public static function getIdByName($name)
     {
-        $list = self::getList();
         $title = strtoupper($name);
-        if (!isset($list[$title])) {
-            throw new SidRuntimeException(get_called_class().":{$name} not exists");
-        }
+
+        $list = self::getList();
+        if (!isset($list[ $title ]))
+            throw new SidItemNotFound(get_called_class() . ":{$name} not exists");
+
         // todo Need to consider if to use ReflectionClass instead of arrays
-        
-        return $list[$name];
+        return $list[ $name ];
     }
 
     /**
@@ -191,31 +196,25 @@ abstract class Sid
      */
     public static function getList($full = false)
     {
-        if (empty(self::$list)) {
+        if (empty(self::$list))
             self::$list = self::extractConstants();
-        }
-        
-        foreach (self::$list as $name=>$sid) {
-            if (!self::isValid($name)) {
-                unset(self::$list[$name]);
-            }
-        }
-        
+
+        foreach (self::$list as $name => $sid)
+            if (!self::isValid($name))
+                unset(self::$list[ $name ]);
+
         $list = self::$list;
         if (!$full) {
-            foreach ($list as $name=>$sid) {
-                if (static::isHidden($name)) {
-                    unset($list[$name]);
-                }
-            }
-        } else {
-            foreach ($list as $name=>$sid) {
-                if (static::isHidden($name)) {
-                    $list = self::updateHiddenValue($list, $name);
-                }
-            }
+            foreach ($list as $name => $sid)
+                if (static::isHidden($name))
+                    unset($list[ $name ]);
         }
-        
+        else {
+            foreach ($list as $name => $sid)
+                if (static::isHidden($name))
+                    $list = self::updateHiddenValue($list, $name);
+        }
+
         return $list;
     }
 
@@ -223,17 +222,17 @@ abstract class Sid
      * Return constant name from SID.
      *
      * @param int $id SID to find
+     *
      * @return string Name of constant.
-     * @throws SidRuntimeException
+     * @throws SidItemNotFound
      */
     public static function getNameById($sid)
     {
         $list = self::getList(true);
         $key = array_search($sid, $list);
-        if ($key === false) {
-            throw new SidRuntimeException('Sid not exists');
-        }
-        
+        if ($key === false)
+            throw new SidItemNotFound('Sid not exists');
+
         return $key;
     }
 
@@ -243,25 +242,36 @@ abstract class Sid
      * @param int    $id
      * @param string $lang
      * @param string $context
+     *
      * @return mixed
      */
     public static function getTitle($id, $lang, $context = 'default')
     {
         $name = self::getNameById($id);
         $class = self::getClassWithoutNamespace();
-        $vocabulary = self::getVocabulary($lang);
-        
-        return $vocabulary->getTitle($name, $class, $context);
+
+        return call_user_func(self::getCallback($lang), $name, $class, $context);
     }
 
     /**
-     * Returns sid which does not exist. 
+     * Set vocabulary callback function
+     *
+     * @param $lang               string
+     * @param $vocabularyCallback callable
+     */
+    public static function setVocabularyCallback(string $language, callable $vocabularyCallback)
+    {
+        self::$vocabularyCallbacks[ $language ] = $vocabularyCallback;
+    }
+
+    /**
+     * Returns sid which does not exist.
      * Can be used in unit test to test invalid id errors.
      */
     public static function nx()
     {
         $fullList = static::getList(true);
-        
+
         return max(array_values($fullList)) + 1;
     }
 }

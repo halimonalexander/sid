@@ -14,5 +14,5 @@ class testSid extends Sid
     const TEST_VALUE_4 = 4;
     
     // This Sid must be ignored
-    const __INVALID_VALUE = 5; 
+    const __INVALID_VALUE = 5;
 }
