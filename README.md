@@ -15,7 +15,7 @@ id, status
 ```
 Somewhere in code:
 ```php
-if ($this->user->status == 10){ // who knows what means 10?
+if ($this->user->status == 10){ // who knows what 10 means?
     ...
 }
 ```
@@ -46,11 +46,19 @@ if ($this->user->status == userStatus::UNAUTHORISED){
 
 ## Multilanguage support
 
-If you have vocabularies for different languages, you can do so:
+If you have vocabularies for different languages, you can do use it to get text messages. If no callback set, a default one will be called:
 ```php
-echo userStatus::getTitle(userStatus::ACITIVE, 'ru');
+userStatus::setVocabularyCallback('ru', 'MyRuVocabulary::translate');
+...
+echo userStatus::getTitle(userStatus::ACTIVE, 'ru');
+echo userStatus::getTitle(userStatus::ACTIVE, 'pl');
 ```
 Result:
 ```
 Активный пользователь
+userStatus.active
 ```
+
+## Tests
+
+Tests will become easier. Use can use `sid::NX()` method to get not defiened value.

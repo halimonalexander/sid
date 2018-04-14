@@ -23,7 +23,7 @@ class Sid extends TestCase{
     $nxSid = testSid::nx();
     $this->assertEquals($nxSid, 5);
 
-    $this->expectException('\HalimonAlexander\Sid\Exception\SidRuntimeException');
+    $this->expectException('\HalimonAlexander\Sid\Exception\SidItemNotFound');
     testSid::getNameById($nxSid);
   }
   
