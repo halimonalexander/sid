@@ -133,11 +133,11 @@ abstract class Sid
      */
     protected static function updateHiddenValue($list, $name)
     {
-        $sid = $list[ $name ];
-        unset($list[ $name ]);
+        $sid = $list[$name];
+        unset($list[$name]);
 
         preg_match("/" . self::$hiddenSidNamePattern . "/", $name, $match);
-        $list[ $match[1] ] = $sid;
+        $list[$match[1]] = $sid;
 
         return $list;
     }
@@ -192,30 +192,40 @@ abstract class Sid
     /**
      * Get full sid list
      *
-     * @return array List of values as: Name=>Sid
+     * @param bool $full
+     *
+     * @return array List of values as: Name => Sid
      */
-    public static function getList($full = false)
+    public static function getList(bool $full = false)
     {
-        if (empty(self::$list))
-            self::$list = self::extractConstants();
-
-        foreach (self::$list as $name => $sid)
-            if (!self::isValid($name))
-                unset(self::$list[ $name ]);
-
-        $list = self::$list;
-        if (!$full) {
-            foreach ($list as $name => $sid)
-                if (static::isHidden($name))
-                    unset($list[ $name ]);
+        $class = get_called_class();
+        if (empty(self::$list[$class])) {
+            self::$list[$class] = self::loadList();
         }
-        else {
-            foreach ($list as $name => $sid)
-                if (static::isHidden($name))
+        
+        $list = self::$list[$class];
+        
+        foreach ($list as $name => $sid) {
+            if (static::isHidden($name)) {
+                if (!$full)
+                    unset($list[$name]);
+                else
                     $list = self::updateHiddenValue($list, $name);
+            }
         }
 
         return $list;
+    }
+    
+    private static function loadList()
+    {
+        $list = self::extractConstants();
+    
+        foreach ($list as $name => $sid)
+            if (!self::isValid($name))
+                unset($list[$name]);
+    
+         return $list;
     }
 
     /**
