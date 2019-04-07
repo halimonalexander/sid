@@ -1,5 +1,9 @@
 # SID
 
+[![Build Status](https://travis-ci.org/halimonalexander/sid.svg?branch=master)](https://travis-ci.org/halimonalexander/sid)
+[![Code Climate](https://codeclimate.com/github/halimonalexander/sid/badges/gpa.svg)](https://codeclimate.com/github/halimonalexander/sid)
+[![Test Coverage](https://codeclimate.com/github/halimonalexander/sid/badges/coverage.svg)](https://codeclimate.com/github/halimonalexander/sid/coverage)
+
 Sequence Identifier class.
 Class is used to move constants from SQL to PHP code and for other uses.
 
