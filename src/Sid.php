@@ -48,7 +48,7 @@ abstract class Sid
 
     public static $allowDefaultCallback = true;
 
-    public static $defaultCallback = 'self::defaultCallback';
+    public static $defaultCallback = 'static::defaultCallback';
 
     /**
      * Extract constants using ReflectionClass
@@ -79,8 +79,8 @@ abstract class Sid
         if (isset(self::$vocabularyCallbacks[ $language ]))
             return self::$vocabularyCallbacks[ $language ];
 
-        if (self::$allowDefaultCallback)
-            return self::$defaultCallback;
+        if (static::$allowDefaultCallback)
+            return static::$defaultCallback;
 
         $classname = self::getClassWithoutNamespace();
 
